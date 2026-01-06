@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>OMNIBOX | HORIZON OS</title>
+    <style>
+        :root { 
+            --p: #00ffcc; --bg: #000; --panel-bg: rgba(8, 10, 16, 0.92); 
+            --wall: #ff0055; --accent: #ff00ff; --glass: rgba(255, 255, 255, 0.04);
+            --border: rgba(255, 255, 255, 0.1);
+            --void: #0b0b14;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', 'Courier New', monospace; }
+        body { background: #000; color: white; overflow: hidden; height: 100vh; user-select: none; }
+        
+        /* THEME DEFS (UNTOUCHED) */
+        body.t-void   { --p: #00ffcc; --bg: #000000; }
+        body.t-matrix { --p: #00ff44; --bg: #000800; }
+        body.t-vapor  { --p: #ff71ce; --bg: #050005; }
+        body.t-blood  { --p: #ff0000; --bg: #100000; }
+        body.t-gold   { --p: #ffd700; --bg: #0a0a00; }
+        body.t-cyber  { --p: #00d9ff; --bg: #010008; }
+        body.t-nuclear { --p: #ccff00; --bg: #050a00; }
+        body.t-glitch  { --p: #ffffff; --bg: #111111; }
+        body.t-ocean   { --p: #0088ff; --bg: #000510; }
+        body.t-forest  { --p: #22ff88; --bg: #000a02; }
+        body.t-sunset  { --p: #ff5500; --bg: #1a0500; }
+        body.t-mono    { --p: #888888; --bg: #000000; }
+        body.t-nebula  { --p: #aa00ff; --bg: #050010; }
+        body.t-mint    { --p: #aaffdd; --bg: #000805; }
+        body.t-lava    { --p: #ff3300; --bg: #0d0000; }
+        body.t-ice     { --p: #00ffff; --bg: #000c14; }
+        body.t-royal   { --p: #ffcc00; --bg: #100020; }
+        body.t-toxic   { --p: #33ff00; --bg: #000f00; }
+        body.t-sakura  { --p: #ffb7c5; --bg: #100005; }
+        body.t-slate   { --p: #708090; --bg: #080808; }
+        body.t-overdrive { --p: #fffb00; --bg: #000000; }
+
+        canvas { position: fixed; inset: 0; z-index: 5; background: var(--bg); transition: background 1s; }
+        
+        /* FX LAYERS */
+        #fx-scan { position: fixed; inset: 0; z-index: 6; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.1) 3px, rgba(0,0,0,0.1) 4px); opacity: 0; transition: 0.5s; }
+        #fx-noise { position: fixed; inset: 0; z-index: 7; pointer-events: none; opacity: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E"); transition: 0.5s; }
+        #fx-vignette { position: fixed; inset: 0; z-index: 8; pointer-events: none; background: radial-gradient(circle, transparent 40%, black 100%); opacity: 0; transition: 0.5s; }
+
+        /* --- ANIMATED SPACE BACKGROUND (SHARED) --- */
+        .space-bg {
+            position: absolute; inset: -50px; z-index: -1; pointer-events: none;
+            background-image: 
+                radial-gradient(1px 1px at 10% 10%, #fff 100%, transparent),
+                radial-gradient(1px 1px at 20% 20%, #fff 100%, transparent),
+                radial-gradient(2px 2px at 30% 30%, #fff 100%, transparent),
+                radial-gradient(1px 1px at 40% 40%, #fff 100%, transparent),
+                radial-gradient(2px 2px at 50% 50%, #fff 100%, transparent),
+                radial-gradient(1px 1px at 60% 60%, #fff 100%, transparent),
+                radial-gradient(1px 1px at 70% 70%, #fff 100%, transparent),
+                radial-gradient(2px 2px at 80% 80%, #fff 100%, transparent),
+                radial-gradient(1px 1px at 90% 90%, #fff 100%, transparent);
+            background-size: 550px 550px; opacity: 0.2;
+            animation: spaceDrift 60s linear infinite;
+        }
+        @keyframes spaceDrift { 0% { transform: translateY(0); } 100% { transform: translateY(-550px); } }
+
+        /* --- BOOT OVERLAY --- */
+        #overlay {
+            position: fixed; inset: 0; z-index: 9999; background: #050508;
+            display: grid; grid-template-columns: 300px 1fr 300px; grid-template-rows: 100px 1fr 100px;
+            overflow: hidden; perspective: 1000px;
+            transition: opacity 0.8s ease-in-out, transform 0.8s ease-in-out;
+        }
+        #overlay.fade-out { opacity: 0; pointer-events: none; transform: scale(1.1); }
+        .center-stage { grid-column: 2; grid-row: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; z-index: 10; }
+        .title-glitch { font-size: 7rem; font-weight: 900; letter-spacing: 25px; color: #fff; text-shadow: 4px 4px 0px var(--p); animation: glitch 3s infinite; }
+        @keyframes glitch { 0%, 100% { text-shadow: 4px 4px 0px var(--p); transform: skew(0deg); } 2% { text-shadow: -2px -2px 0px #ff0055; transform: skew(10deg); } }
+        .subtitle { color: var(--p); letter-spacing: 8px; font-size: 0.8rem; margin-top: 10px; opacity: 0.8; text-transform: uppercase; }
+        .start-btn { margin-top: 60px; padding: 25px 80px; background: rgba(0, 255, 204, 0.1); border: 1px solid var(--p); color: var(--p); font-size: 1rem; font-weight: 900; letter-spacing: 5px; cursor: pointer; transition: 0.3s; position: relative; overflow: hidden; box-shadow: 0 0 20px rgba(0, 255, 204, 0.1); }
+        .start-btn:hover { background: var(--p); color: #000; box-shadow: 0 0 60px var(--p); transform: scale(1.05); }
+
+        /* --- SETTINGS COMMAND PANEL --- */
+        #command-panel {
+            position: fixed; right: -950px; top: 0; width: 900px; height: 100%;
+            background: var(--panel-bg); border-left: 1px solid var(--p);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            z-index: 1800; padding: 0; display: grid; grid-template-columns: 200px 1fr;
+            transition: right 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+            box-shadow: -50px 0 150px rgba(0,0,0,0.9);
+        }
+        #command-panel.open { right: 0; }
+
+        /* Left Sidebar of Settings (Telemetry) */
+        .cmd-sidebar {
+            border-right: 1px solid var(--border);
+            padding: 30px 20px; font-family: 'Courier New', monospace;
+            display: flex; flex-direction: column;
+            background: rgba(0,0,0,0.2);
+            position: relative; overflow: hidden;
+        }
+        .tele-row { display: flex; justify-content: space-between; font-size: 0.55rem; color: #666; margin-bottom: 6px; letter-spacing: 1px; }
+        .tele-val { color: var(--p); font-weight: bold; }
+        .tele-title { font-size: 0.6rem; color: #fff; border-bottom: 1px solid var(--border); padding-bottom: 5px; margin: 20px 0 10px 0; opacity: 0.5; }
+        
+        .log-box {
+            margin-top: auto; height: 150px; border: 1px solid var(--border);
+            background: rgba(0,0,0,0.5); padding: 10px; overflow: hidden;
+            font-size: 0.5rem; color: #444; line-height: 1.4;
+        }
+        .log-item { margin-bottom: 2px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+        /* Main Settings Area */
+        .cmd-main { display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .panel-header { padding: 30px 40px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); }
+        .panel-title { font-size: 1.2rem; font-weight: 900; letter-spacing: 4px; color: var(--p); }
+        
+        .tab-nav { display: flex; background: rgba(0,0,0,0.3); padding: 0 40px; }
+        .tab-btn { padding: 20px 25px; background: transparent; border: none; border-bottom: 2px solid transparent; color: #666; cursor: pointer; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; transition: 0.3s; }
+        .tab-btn.active { border-bottom-color: var(--p); color: var(--p); text-shadow: 0 0 10px rgba(0,255,204,0.3); }
+
+        .tab-content { display: none; padding: 40px; overflow-y: auto; height: 100%; }
+        .tab-content.active { display: block; animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Controls */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+        .section-title { grid-column: 1 / -1; font-size: 0.65rem; color: #fff; opacity: 0.5; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+        .ctrl-group { background: var(--glass); padding: 15px; border: 1px solid var(--border); border-radius: 4px; transition: 0.2s; }
+        .ctrl-group:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); }
+        label { font-size: 0.6rem; color: var(--p); letter-spacing: 1px; font-weight: 700; display: flex; justify-content: space-between; margin-bottom: 8px; text-transform: uppercase; }
+        input[type=range] { width: 100%; appearance: none; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; outline: none; }
+        input[type=range]::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; background: var(--p); border-radius: 50%; cursor: pointer; box-shadow: 0 0 10px var(--p); transition: 0.2s; }
+        input[type=checkbox] { accent-color: var(--p); transform: scale(1.2); cursor: pointer; }
+        .check-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.7rem; color: #ccc; cursor: pointer; padding: 5px 0; }
+
+        .hud-btn { position: fixed; z-index: 1000; background: rgba(0,0,0,0.8); border: 1px solid var(--p); backdrop-filter: blur(5px); color: var(--p); padding: 15px 30px; cursor: pointer; font-weight: 900; letter-spacing: 3px; transition: 0.4s; font-size: 0.7rem; }
+        .hud-btn:hover { background: var(--p); color: #000; box-shadow: 0 0 30px var(--p); }
+        #status-bar { position: fixed; bottom: 40px; left: 40px; z-index: 1000; font-size: 0.7rem; font-weight: 900; color: var(--p); letter-spacing: 3px; padding: 10px 20px; background: rgba(0,0,0,0.6); border-left: 3px solid var(--p); }
+
+        /* Decor */
+        .rotating-hex { position: absolute; bottom: -50px; right: -50px; width: 200px; height: 200px; border: 2px solid rgba(255,255,255,0.05); transform: rotate(45deg); animation: rot 20s linear infinite; pointer-events: none; }
+        @keyframes rot { 100% { transform: rotate(405deg); } }
+    </style>
+</head>
+<body class="t-void">
+
+    <div id="fx-scan"></div>
+    <div id="fx-noise"></div>
+    <div id="fx-vignette"></div>
+
+    <div id="overlay">
+        <div class="space-bg"></div>
+        <div class="center-stage">
+            <h1 class="title-glitch">OMNIBOX</h1>
+            <p class="subtitle">HORIZON EDITION V32.0</p>
+            <button class="start-btn" onclick="Lab.boot()">INITIALIZE</button>
+        </div>
+    </div>
+
+    <button class="hud-btn" style="top:40px; right:40px;" onclick="Lab.openSettings()">CONTROLS [S]</button>
+    <button class="hud-btn" style="top:40px; right:260px;" onclick="Lab.togglePause()">FREEZE [P]</button>
+    <button class="hud-btn" style="top:40px; left:40px;" onclick="Lab.toggleSiphon()">SIPHON [B]</button>
+    <div id="status-bar">SYSTEM NOMINAL</div>
+
+    <div id="command-panel">
+        <div class="space-bg"></div> <div class="cmd-sidebar">
+            <div style="font-size:0.7rem; color:#fff; font-weight:900; letter-spacing:3px; margin-bottom:20px; border-bottom:1px solid var(--p); padding-bottom:10px;">SYS_MONITOR</div>
+            
+            <div class="tele-title">CORE METRICS</div>
+            <div class="tele-row"><span>UPTIME</span><span class="tele-val" id="t-time">00:00:00</span></div>
+            <div class="tele-row"><span>FPS DELTA</span><span class="tele-val" id="t-fps">16.6ms</span></div>
+            <div class="tele-row"><span>ENTITIES</span><span class="tele-val" id="t-ent">0</span></div>
+            <div class="tele-row"><span>SIPHONS</span><span class="tele-val" id="t-siph">0</span></div>
+            <div class="tele-row"><span>PARTICLES</span><span class="tele-val" id="t-part">0</span></div>
+            
+            <div class="tele-title">HARDWARE (SIM)</div>
+            <div class="tele-row"><span>CPU LOAD</span><span class="tele-val">14%</span></div>
+            <div class="tele-row"><span>MEM ALLOC</span><span class="tele-val">512MB</span></div>
+            <div class="tele-row"><span>CORE TEMP</span><span class="tele-val">42°C</span></div>
+            <div class="tele-row"><span>RENDERER</span><span class="tele-val">CANVAS2D</span></div>
+            <div class="tele-row"><span>ACCELERATION</span><span class="tele-val">ENABLED</span></div>
+
+            <div class="tele-title">NETWORK / USER</div>
+            <div class="tele-row"><span>USER ID</span><span class="tele-val">ADMIN_01</span></div>
+            <div class="tele-row"><span>SESSION</span><span class="tele-val">#A99-22</span></div>
+            <div class="tele-row"><span>REGION</span><span class="tele-val">NA-WEST</span></div>
+            <div class="tele-row"><span>PING</span><span class="tele-val">1ms</span></div>
+            <div class="tele-row"><span>ENCRYPTION</span><span class="tele-val">AES-256</span></div>
+
+            <div class="tele-title">GLOBAL STATE</div>
+            <div class="tele-row"><span>GRAVITY</span><span class="tele-val" id="t-grav">ON</span></div>
+            <div class="tele-row"><span>TIME SCALE</span><span class="tele-val" id="t-time-s">100%</span></div>
+            <div class="tele-row"><span>AUDIO</span><span class="tele-val">MUTED</span></div>
+            <div class="tele-row"><span>INPUT</span><span class="tele-val">MOUSE+KB</span></div>
+            <div class="tele-row"><span>BATTERY</span><span class="tele-val">100%</span></div>
+
+            <div class="log-box" id="sys-log">
+                <div class="log-item">> SYSTEM_INIT_OK</div>
+            </div>
+            
+            <div style="margin-top:20px; text-align:center; font-size:0.5rem; color:#444;">OMNIBOX CORP © 2026</div>
+        </div>
+
+        <div class="cmd-main">
+            <div class="rotating-hex"></div>
+            <div class="panel-header">
+                <div class="panel-title">CONFIGURATION</div>
+                <button onclick="Lab.closeSettings()" style="background:none; border:none; color:var(--p); font-size:1.5rem; cursor:pointer; text-shadow:0 0 10px var(--p);">&times;</button>
+            </div>
+            
+            <div class="tab-nav">
+                <button class="tab-btn active" onclick="Lab.tab(0)">Physics</button>
+                <button class="tab-btn" onclick="Lab.tab(1)">Visuals</button>
+                <button class="tab-btn" onclick="Lab.tab(2)">Siphon</button>
+                <button class="tab-btn" onclick="Lab.tab(3)">Quantum</button>
+                <button class="tab-btn" onclick="Lab.tab(4)">Post-FX</button>
+            </div>
+
+            <div id="tab-0" class="tab-content active">
+                <div class="section-title">Gravitational Constants</div>
+                <div class="grid-2">
+                    <div class="ctrl-group"><label>Gravity Y</label><input type="range" data-key="gravY" min="-200" max="200" value="40" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Gravity X</label><input type="range" data-key="gravX" min="-100" max="100" value="0" oninput="Lab.sync(this)"></div>
+                </div>
+                <div class="section-title">Material Properties</div>
+                <div class="grid-2">
+                    <div class="ctrl-group"><label>Wall Bounce</label><input type="range" data-key="bounce" min="0" max="150" value="90" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Entity Bounce</label><input type="range" data-key="entBounce" min="0" max="200" value="120" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Air Friction</label><input type="range" data-key="fric" min="900" max="1000" value="980" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Rotational Drag</label><input type="range" data-key="rotDrag" min="900" max="1000" value="980" oninput="Lab.sync(this)"></div>
+                </div>
+                <div class="section-title">Collision Logic</div>
+                <div class="grid-2">
+                     <label class="check-row"><input type="checkbox" data-key="coll" checked onchange="Lab.sync(this)"> Enable Collisions</label>
+                     <label class="check-row"><input type="checkbox" data-key="bomb" onchange="Lab.sync(this)"> Reactive Explosions</label>
+                </div>
+            </div>
+
+            <div id="tab-1" class="tab-content">
+                <div class="section-title">Entity Rendering</div>
+                <div class="grid-2">
+                    <div class="ctrl-group"><label>Spawn Mass</label><input type="range" data-key="size" min="5" max="300" value="45" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Stroke Width</label><input type="range" data-key="strokeW" min="0" max="100" value="10" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Glow Strength</label><input type="range" data-key="glowStr" min="0" max="50" value="0" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Corner Radius</label><input type="range" data-key="corner" min="0" max="50" value="0" oninput="Lab.sync(this)"></div>
+                </div>
+                <div class="section-title">Trail & Color</div>
+                <div class="grid-2">
+                    <div class="ctrl-group"><label>Trail Persistence</label><input type="range" data-key="trail" min="0" max="98" value="20" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Hue Speed</label><input type="range" data-key="hueSpd" min="0" max="100" value="20" oninput="Lab.sync(this)"></div>
+                    <label class="check-row"><input type="checkbox" data-key="rainbow" checked onchange="Lab.sync(this)"> Rainbow Cycle</label>
+                    <label class="check-row"><input type="checkbox" data-key="pulse" onchange="Lab.sync(this)"> Size Pulse</label>
+                    <label class="check-row"><input type="checkbox" data-key="streak" onchange="Lab.sync(this)"> Velocity Vectors</label>
+                    <label class="check-row"><input type="checkbox" data-key="fill" checked onchange="Lab.sync(this)"> Fill Entities</label>
+                </div>
+            </div>
+
+            <div id="tab-2" class="tab-content">
+                <div class="section-title">Field Mechanics</div>
+                <div class="grid-2">
+                    <div class="ctrl-group"><label>Field Strength</label><input type="range" data-key="sPower" min="-200" max="200" value="60" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Event Horizon</label><input type="range" data-key="sRad" min="100" max="1200" value="350" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Deadzone Radius</label><input type="range" data-key="sDead" min="0" max="200" value="20" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Falloff Curve</label><input type="range" data-key="sFalloff" min="10" max="30" value="15" oninput="Lab.sync(this)"></div>
+                </div>
+                <div class="section-title">Field Visuals</div>
+                <div class="grid-2">
+                    <div class="ctrl-group"><label>Ring Speed</label><input type="range" data-key="sRingSpd" min="0" max="50" value="5" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Ring Opacity</label><input type="range" data-key="sRingOp" min="0" max="100" value="20" oninput="Lab.sync(this)"></div>
+                    <label class="check-row"><input type="checkbox" data-key="sVortex" onchange="Lab.sync(this)"> Vortex Spin</label>
+                    <label class="check-row"><input type="checkbox" data-key="sInv" onchange="Lab.sync(this)"> Invert Visuals</label>
+                </div>
+                <button onclick="Lab.wipeSiphons()" style="width:100%; padding:15px; background:rgba(255,0,0,0.1); color:#ff5555; border:1px solid #ff5555; font-weight:900; cursor:pointer;">PURGE ANCHORS</button>
+            </div>
+
+            <div id="tab-3" class="tab-content">
+                <div class="section-title">Time & Space</div>
+                <div class="grid-2">
+                    <div class="ctrl-group"><label>Time Dilation</label><input type="range" data-key="timeScale" min="0" max="200" value="100" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Grid Snap</label><input type="range" data-key="gridSnap" min="0" max="200" value="60" oninput="Lab.sync(this)"></div>
+                </div>
+                <div class="section-title">Spawn Dynamics</div>
+                <div class="grid-2">
+                    <div class="ctrl-group"><label>Spawn Count</label><input type="range" data-key="spawnCount" min="1" max="20" value="3" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Ejection Force</label><input type="range" data-key="spawnForce" min="0" max="100" value="25" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Spawn Rotation</label><input type="range" data-key="spawnRot" min="0" max="100" value="40" oninput="Lab.sync(this)"></div>
+                    <label class="check-row"><input type="checkbox" data-key="mag" onchange="Lab.sync(this)"> Mouse Gravity</label>
+                </div>
+            </div>
+
+            <div id="tab-4" class="tab-content">
+                <div class="section-title">Theme Engine</div>
+                <select id="v_theme" onchange="Lab.updateTheme()" style="width:100%; background:rgba(255,255,255,0.05); color:var(--p); border:1px solid var(--p); padding:15px; font-weight:900; margin-bottom:30px;">
+                    <optgroup label="Core Originals">
+                        <option value="void">DEEP VOID</option><option value="matrix">DIGITAL ARCHIVE</option><option value="vapor">VAPORWAVE RETRO</option><option value="blood">HAZARD PROTOCOL</option><option value="gold">LUXURY GOLD</option><option value="cyber">CYBERPUNK NEON</option>
+                    </optgroup>
+                    <optgroup label="Multiverse Expansion">
+                        <option value="nuclear">URANIUM 235</option><option value="glitch">NULL POINTER</option><option value="ocean">ABYSSAL</option><option value="forest">OVERGROWTH</option><option value="sunset">HORIZON</option><option value="mono">QUARTZ</option><option value="nebula">ORION ARM</option><option value="mint">CRYOGENIC</option><option value="lava">MAGMA CORE</option><option value="ice">GLACIER</option><option value="royal">EMPIRE</option><option value="toxic">VENOM</option><option value="sakura">HANAMI</option><option value="slate">INDUSTRIAL</option><option value="overdrive">OVERDRIVE</option>
+                    </optgroup>
+                </select>
+                <div class="section-title">Post-Processing</div>
+                <div class="grid-2">
+                    <div class="ctrl-group"><label>Bloom Intensity</label><input type="range" data-key="bloom" min="0" max="100" value="0" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Scanline Opacity</label><input type="range" data-key="scan" min="0" max="50" value="0" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Film Grain</label><input type="range" data-key="noise" min="0" max="50" value="0" oninput="Lab.sync(this)"></div>
+                    <div class="ctrl-group"><label>Vignette</label><input type="range" data-key="vignette" min="0" max="100" value="0" oninput="Lab.sync(this)"></div>
+                </div>
+                <label class="check-row"><input type="checkbox" data-key="shake" checked onchange="Lab.sync(this)"> Camera Shake</label>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="world"></canvas>
+
+    <script>
+        /**
+         * OMNIBOX CORE ENGINE V32.0 | HORIZON OS
+         * ALL ORIGINAL PHYSICS LOGIC PRESERVED.
+         * NEW: AUTO-PAUSE & TELEMETRY
+         */
+        const canvas = document.getElementById('world');
+        const ctx = canvas.getContext('2d');
+        
+        const CFG = {
+            gravX:0, gravY:40, bounce:90, entBounce:120, fric:980, rotDrag:980,
+            coll:true, bomb:false,
+            size:45, strokeW:10, glowStr:0, corner:0, trail:20, hueSpd:20, rainbow:true, pulse:false, streak:false, fill:true,
+            sPower:60, sRad:350, sDead:20, sFalloff:15, sRingSpd:5, sRingOp:20, sVortex:false, sInv:false,
+            timeScale:100, gridSnap:60, spawnCount:3, spawnForce:25, spawnRot:40, mag:false,
+            bloom:0, scan:0, noise:0, vignette:0, shake:true
+        };
+
+        const Lab = {
+            ents: [], siphons: [], particles: [], 
+            active: false, paused: false, siphonMode: false, wasPausedBeforeMenu: false,
+            isDown: false, mx: 0, my: 0, lastS: 0, frame: 0, shk: 0, startTime: Date.now(),
+
+            init() {
+                canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+                window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+                
+                document.querySelectorAll('input[data-key]').forEach(i => {
+                    const key = i.dataset.key;
+                    if(i.type === 'checkbox') i.checked = CFG[key];
+                    else i.value = CFG[key];
+                });
+
+                window.addEventListener('mousedown', (e) => { 
+                    if (this.isUi(e.target)) return; 
+                    this.isDown = true; 
+                    if(CFG.bomb) this.shk = 15;
+                });
+                window.addEventListener('mousemove', (e) => { this.mx = e.clientX; this.my = e.clientY; });
+                window.addEventListener('mouseup', () => { this.isDown = false; });
+                window.addEventListener('keydown', (e) => {
+                    const k = e.key.toLowerCase();
+                    if(k === 'b') this.toggleSiphon();
+                    if(k === 'p') this.togglePause();
+                    if(k === 's') this.openSettings();
+                });
+                
+                // Start Loop
+                this.loop();
+                // Start Telemetry
+                setInterval(() => this.updateTelemetry(), 500);
+            },
+
+            sync(el) {
+                const k = el.dataset.key;
+                CFG[k] = el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+                if(k === 'bloom') canvas.style.filter = `saturate(1.5) blur(${CFG.bloom/100}px) brightness(${1+CFG.bloom/200})`;
+                if(k === 'scan') document.getElementById('fx-scan').style.opacity = CFG.scan/100;
+                if(k === 'noise') document.getElementById('fx-noise').style.opacity = CFG.noise/100;
+                if(k === 'vignette') document.getElementById('fx-vignette').style.opacity = CFG.vignette/100;
+                this.logAction(`SETTING_CHANGE: ${k.toUpperCase()}`);
+            },
+
+            isUi(el) { return document.getElementById('command-panel').contains(el) || el.classList.contains('hud-btn'); },
+            
+            boot() { 
+                document.getElementById('overlay').classList.add('fade-out');
+                setTimeout(() => { document.getElementById('overlay').style.display = 'none'; this.active = true; }, 800);
+                this.logAction('SYSTEM_BOOT_SEQUENCE_COMPLETE');
+            },
+            
+            togglePause() { 
+                this.paused = !this.paused; 
+                document.getElementById('status-bar').innerText = this.paused ? "FROZEN" : "NOMINAL"; 
+                this.logAction(this.paused ? "TIMELINE_PAUSED" : "TIMELINE_RESUMED");
+            },
+            
+            toggleSiphon() { 
+                this.siphonMode = !this.siphonMode; 
+                const tag = document.getElementById('status-bar');
+                tag.innerText = this.siphonMode ? "BUILDER MODE" : "NOMINAL";
+                tag.style.color = this.siphonMode ? "var(--wall)" : "var(--p)";
+                this.logAction(this.siphonMode ? "SIPHON_BUILDER_ACTIVE" : "STANDARD_PHYSICS_ACTIVE");
+            },
+
+            // --- MENU LOGIC WITH AUTO-PAUSE ---
+            openSettings() { 
+                this.wasPausedBeforeMenu = this.paused; // Remember state
+                this.paused = true; 
+                document.getElementById('command-panel').classList.add('open'); 
+                document.getElementById('status-bar').innerText = "CONFIGURING...";
+                this.logAction('OPEN_CONFIGURATION_DECK');
+            },
+            closeSettings() { 
+                document.getElementById('command-panel').classList.remove('open');
+                // Only unpause if it wasn't paused manually before
+                if(!this.wasPausedBeforeMenu) {
+                    this.paused = false;
+                    document.getElementById('status-bar').innerText = "NOMINAL";
+                } else {
+                    document.getElementById('status-bar').innerText = "FROZEN";
+                }
+                this.logAction('RESUMING_SIMULATION');
+            },
+            
+            tab(idx) {
+                document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+                document.querySelectorAll('.tab-content').forEach((t, i) => t.classList.toggle('active', i === idx));
+            },
+            updateTheme() { document.body.className = 't-' + document.getElementById('v_theme').value; },
+            wipeSiphons() { this.siphons = []; this.logAction('SIPHON_ANCHORS_PURGED'); },
+
+            logAction(msg) {
+                const b = document.getElementById('sys-log');
+                const d = new Date();
+                const ts = `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
+                b.innerHTML += `<div class="log-item">[${ts}] ${msg}</div>`;
+                b.scrollTop = b.scrollHeight;
+            },
+
+            updateTelemetry() {
+                if(!this.active) return;
+                const now = Date.now();
+                const uptime = new Date(now - this.startTime).toISOString().substr(11, 8);
+                document.getElementById('t-time').innerText = uptime;
+                document.getElementById('t-ent').innerText = this.ents.length;
+                document.getElementById('t-siph').innerText = this.siphons.length;
+                document.getElementById('t-part').innerText = this.particles.length;
+                document.getElementById('t-grav').innerText = (CFG.gravY !== 0 || CFG.gravX !== 0) ? "ACTIVE" : "NULL";
+                document.getElementById('t-time-s').innerText = CFG.timeScale + "%";
+            },
+
+            createSparks(x, y, color, count = 10) {
+                for(let i=0; i<count; i++) {
+                    this.particles.push({ 
+                        x, y, vx: (Math.random()-0.5)*18, vy: (Math.random()-0.5)*18, 
+                        life: 1.0, decay: 0.01 + Math.random()*0.02, c: color 
+                    });
+                }
+            },
+
+            spawn() {
+                const now = performance.now();
+                if (now - this.lastS < 50) return;
+                this.lastS = now;
+                let sx = this.mx, sy = this.my;
+                if(CFG.gridSnap > 0) { 
+                    sx = Math.round(sx/CFG.gridSnap)*CFG.gridSnap; 
+                    sy = Math.round(sy/CFG.gridSnap)*CFG.gridSnap; 
+                }
+                
+                if (this.siphonMode) {
+                    this.siphons.push({ x: sx, y: sy, pow: CFG.sPower, rad: CFG.sRad });
+                } else {
+                    for(let i=0; i<CFG.spawnCount; i++) {
+                        this.ents.push({ 
+                            x: sx, y: sy, 
+                            vx: (Math.random()-0.5)*CFG.spawnForce, 
+                            vy: (Math.random()-0.5)*CFG.spawnForce, 
+                            s: CFG.size, h: Math.random()*360, rot: 0, 
+                            rv: (Math.random()-0.5)*(CFG.spawnRot/50), 
+                            born: Date.now(), scale: 0.1 
+                        });
+                    }
+                }
+            },
+
+            processCollisions() {
+                if(!CFG.coll) return;
+                for (let i = 0; i < this.ents.length; i++) {
+                    let a = this.ents[i];
+                    for (let j = i + 1; j < this.ents.length; j++) {
+                        let b = this.ents[j];
+                        let dx = b.x - a.x, dy = b.y - a.y, dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                        let minDist = (a.s * a.scale + b.s * b.scale) / 2;
+                        if (dist < minDist) {
+                            let overlap = minDist - dist;
+                            let nx = dx / dist, ny = dy / dist;
+                            a.x -= nx * (overlap / 2); a.y -= ny * (overlap / 2);
+                            b.x += nx * (overlap / 2); b.y += ny * (overlap / 2);
+                            let relVx = b.vx - a.vx, relVy = b.vy - a.vy;
+                            let dot = relVx * nx + relVy * ny;
+                            if (dot > 0) continue;
+                            
+                            let combinedElast = (CFG.entBounce/100);
+                            if(CFG.bomb) combinedElast *= 3.0;
+
+                            let jImp = -(1 + combinedElast) * dot / 2;
+                            a.vx -= jImp * nx; a.vy -= jImp * ny;
+                            b.vx += jImp * nx; b.vy += jImp * ny;
+                            a.rv *= 0.6; b.rv *= 0.6;
+                            
+                            if(CFG.bomb && Math.abs(jImp) > 5) this.createSparks((a.x+b.x)/2, (a.y+b.y)/2, `hsl(${a.h}, 100%, 50%)`, 4);
+                        }
+                    }
+                }
+            },
+
+            loop() {
+                // If paused, we skip physics but keep rendering static scene for "freeze" effect
+                if (this.active && !this.paused) {
+                    let steps = 1;
+                    if(CFG.timeScale > 100) steps = 2;
+                    
+                    this.frame++;
+                    
+                    ctx.fillStyle = `rgba(0,0,0,${(100 - CFG.trail)/100})`;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    ctx.save();
+                    if(this.shk > 0.1) { 
+                        ctx.translate((Math.random()-0.5)*this.shk, (Math.random()-0.5)*this.shk); 
+                        this.shk *= 0.92; 
+                    }
+
+                    if (this.isDown && !document.getElementById('command-panel').classList.contains('open')) this.spawn();
+                    this.processCollisions();
+
+                    const gX = CFG.gravX / 100;
+                    const gY = CFG.gravY / 100;
+                    const bnc = (CFG.bounce / 100) * -1;
+                    const fric = CFG.fric / 1000;
+                    const rDrag = CFG.rotDrag / 1000;
+                    const tScale = CFG.timeScale / 100;
+
+                    this.particles.forEach((p, pi) => {
+                        p.x += p.vx * tScale; p.y += p.vy * tScale; p.life -= p.decay * tScale;
+                        if(p.life <= 0) { this.particles.splice(pi, 1); return; }
+                        ctx.fillStyle = p.c; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, 3, 3);
+                    });
+                    ctx.globalAlpha = 1;
+
+                    this.siphons.forEach(s => {
+                        for(let i=0; i<4; i++) {
+                            let ringR = (s.rad * (i+1)/4) + Math.sin(this.frame*(CFG.sRingSpd/100) + i)*10;
+                            ctx.beginPath(); ctx.arc(s.x, s.y, Math.abs(ringR), 0, Math.PI*2);
+                            ctx.strokeStyle = `rgba(255,255,255,${(CFG.sRingOp/100) - i*0.05})`;
+                            ctx.setLineDash([10, 20]); ctx.stroke(); ctx.setLineDash([]);
+                        }
+                        let grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.rad);
+                        grad.addColorStop(0, CFG.sInv ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.15)"); 
+                        grad.addColorStop(1, "transparent");
+                        ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(s.x, s.y, s.rad, 0, Math.PI*2); ctx.fill();
+                    });
+
+                    this.ents.forEach((e, i) => {
+                        this.siphons.forEach(s => {
+                            let dx = s.x - e.x, dy = s.y - e.y, d = Math.sqrt(dx*dx + dy*dy) || 1;
+                            if (d < s.rad && d > CFG.sDead) {
+                                let f = Math.pow(1 - d/s.rad, CFG.sFalloff/10) * (s.pow/100);
+                                if(CFG.sInv) f *= -1;
+                                e.vx += dx * f * 0.04 * tScale; e.vy += dy * f * 0.04 * tScale;
+                                if(CFG.sVortex) { e.vx -= dy * f * 0.1 * tScale; e.vy += dx * f * 0.1 * tScale; }
+                            }
+                        });
+
+                        if(CFG.mag) {
+                            let dx = this.mx - e.x, dy = this.my - e.y, d = Math.sqrt(dx*dx+dy*dy);
+                            if(d < 500) { e.vx += dx * 0.02 * tScale; e.vy += dy * 0.02 * tScale; }
+                        }
+
+                        e.vx += gX * tScale; e.vy += gY * tScale;
+                        e.x += e.vx * tScale; e.y += e.vy * tScale;
+                        e.vx *= fric; e.vy *= fric; 
+                        e.rot += e.rv * tScale; e.rv *= rDrag;
+
+                        if(e.scale < 1.0) e.scale += 0.05 * tScale;
+
+                        let hw = (e.s * e.scale) / 2;
+                        if (e.y > canvas.height - hw) { 
+                            e.y = canvas.height - hw; e.vy *= bnc; 
+                            if(Math.abs(e.vy)>3 && CFG.shake) this.shk = Math.abs(e.vy); 
+                        }
+                        if (e.y < hw) { e.y = hw; e.vy *= bnc; } 
+                        if (e.x > canvas.width - hw) { e.x = canvas.width - hw; e.vx *= bnc; }
+                        if (e.x < hw) { e.x = hw; e.vx *= bnc; }
+
+                        ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.rot);
+                        let fs = e.s * e.scale;
+                        if(CFG.pulse) fs *= (1 + Math.sin(this.frame/10)*0.2);
+                        
+                        ctx.lineJoin = "round"; ctx.lineWidth = CFG.strokeW/10;
+                        if(CFG.glowStr > 0) { ctx.shadowBlur = CFG.glowStr; ctx.shadowColor = `hsl(${e.h},100%,50%)`; }
+                        
+                        ctx.fillStyle = `hsl(${e.h}, 100%, 50%)`; 
+                        ctx.strokeStyle = `rgba(255,255,255,0.6)`;
+                        
+                        if(CFG.fill) ctx.fillRect(-fs/2, -fs/2, fs, fs);
+                        ctx.strokeRect(-fs/2, -fs/2, fs, fs);
+                        
+                        ctx.restore();
+
+                        if(CFG.rainbow) e.h = (e.h + (CFG.hueSpd/10)) % 360;
+                        if(CFG.streak) {
+                            ctx.strokeStyle = `hsl(${e.h}, 100%, 50%)`; ctx.globalAlpha = 0.2;
+                            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x - e.vx*5, e.y - e.vy*5); ctx.stroke(); ctx.globalAlpha = 1;
+                        }
+                    });
+                    ctx.restore();
+                }
+                requestAnimationFrame(() => this.loop());
+            }
+        };
+        Lab.init();
+    </script>
+</body>
+</html>
